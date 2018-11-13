@@ -18,7 +18,7 @@ prettyprint(filename)
 
 ## Note
 
-YAML 1.2 documentation can be found [here](yaml.org/spec/1.2/spec.html).
+YAML 1.2 documentation can be found [here](http://yaml.org/spec/1.2/spec.html).
 
 `yaml_parser` only supports a small set of features of YAML and only allows to load data from YAML files,
 not to serialize python data into YAML format. For an overview of what features of YAML are supported, please take a
