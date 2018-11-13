@@ -1,0 +1,22 @@
+name: Max Mustermann
+address: 
+  street: Musterstraße 1
+  city: Musterstadt
+cities:
+  - London
+  - Paris
+  - Bochum
+teams:
+  -
+    name: Vfl Bochum
+    manager: Robin Dutt
+    league: Champions league
+    players:
+      - Lionel Messi
+      - Christiano Ronaldo
+      - Theofanis Gekas
+  -
+    name: Borussia Dortmund
+    manager: Karl Arsch
+    league: Regionalliga
+  
