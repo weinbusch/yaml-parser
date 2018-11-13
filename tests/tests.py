@@ -1,6 +1,7 @@
 from unittest import TestCase
 
 from yaml_parser.tokenizer import tokenizer
+from yaml_parser.parser import Parser
 
 class TokenizerTest(TestCase):
 
@@ -81,3 +82,43 @@ class TokenizerTest(TestCase):
         tokens = list(tokenizer(source))
         self.assertIsToken(tokens[5], 'colon', line=1, column=3)
         self.assertIsToken(tokens[10], 'scalar', 'foobar', line=2, column=7)
+
+class ParserTest(TestCase):
+
+    def parse(self):
+        return Parser().from_file('tests/simple.example.yaml')
+
+    def test_mapping(self):
+        result = self.parse()
+        self.assertEqual(result['name'], 'Max Mustermann')
+        self.assertEqual(result['age'], '33')
+        
+    def test_nested_list(self):
+        result = self.parse()
+        self.assertListEqual(
+            result['cities'],
+            ['London', 'Paris', 'Bochum']
+        )        
+
+    def test_nested_mapping(self):
+        result = self.parse()
+        self.assertDictEqual(
+            result['address'],
+            {
+                'street': 'Musterstraße 1',
+                'city': 'Musterstadt'
+            }
+        )        
+
+    def test_nested_list_with_mappings(self):
+        result = self.parse()
+        self.assertEqual(len(result['teams']), 2)        
+        self.assertDictEqual(
+            result['teams'][0],
+            {
+                'name': 'Vfl Bochum',
+                'manager': 'Robin Dutt',
+                'league': 'Champions League',
+                'players': ['Lionel Messi', 'Christiano Ronaldo', 'Theofanis Gekas']
+            }
+        )

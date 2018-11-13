@@ -1,4 +1,5 @@
 name: Max Mustermann
+age: 33
 address: 
   street: Musterstraße 1
   city: Musterstadt
@@ -10,7 +11,7 @@ teams:
   -
     name: Vfl Bochum
     manager: Robin Dutt
-    league: Champions league
+    league: Champions League
     players:
       - Lionel Messi
       - Christiano Ronaldo
