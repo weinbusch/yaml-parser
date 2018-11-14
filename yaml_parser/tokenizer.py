@@ -7,8 +7,8 @@ PATTERNS = [
     r'(?P<indentation>(^ +))',
     r'(?P<newline>[\r\n])',
     r'(?P<comment># .*)',
-    r'(?P<dash>(- |-$))',
-    r'(?P<colon>(\: |\:$))',
+    r'(?P<dash>(\-(?=\s)))',
+    r'(?P<colon>(\:(?=\s)))',
     r'(?P<open_sequence>\[)',
     r'(?P<close_sequence>\])',
     r'(?P<open_mapping>\{)',
@@ -23,7 +23,7 @@ PATTERNS = [
     # Scalars
     r'(?P<literal>\|[-+]?$)',
     r'(?P<folded>\>$)',
-    r'(?P<scalar>[^,:&*\s#]([^:,\n\r\]\[]|(?<=\S):(?=\S)|,(?!.*\]))*)',
+    r'(?P<scalar>[^,:&*#\s]([^:,\n\r\]\[]|:(?=\S)|,(?=\S))*)',
 ]
 
 MASTER_PATTERN = re.compile('|'.join(PATTERNS), re.MULTILINE)

@@ -14,25 +14,39 @@ class TokenizerTest(TestCase):
         if column:
             self.assertEqual(token.column, column)
 
-    def test_colon(self):
-        source = 'tie-fighter: |\-*-/|'
-        tokens = list(tokenizer(source))
-        self.assertIsToken(tokens[0], 'scalar', 'tie-fighter')
-        self.assertIsToken(tokens[1], 'colon', ': ')
-        self.assertIsToken(tokens[2], 'scalar', '|\-*-/|')
+    def get_tokens(self, source):
+        return list(tokenizer(source))
 
+    def test_colon_inline(self):
+        source = 'url: http://www.foo.bar'
+        tokens = self.get_tokens(source)
+        self.assertIsToken(tokens[0], 'scalar', 'url')
+        self.assertIsToken(tokens[1], 'colon', ':')
+        self.assertIsToken(tokens[2], 'scalar', 'http://www.foo.bar')
+
+    def test_colon_linebreak(self):
+        source = 'foo:\n  bar'
+        tokens = self.get_tokens(source)
+        self.assertIsToken(tokens[0], 'scalar', 'foo')
+        self.assertIsToken(tokens[1], 'colon', ':')
+        self.assertIsToken(tokens[-1], 'scalar', 'bar')
+        
     def test_dash(self):
         source = '\n'.join(['- 1.2', '- -5.4'])
-        tokens = tokenizer(source)
-        self.assertIsToken(next(tokens), 'dash', '- ')
-        self.assertIsToken(next(tokens), 'scalar', '1.2')
-        self.assertIsToken(next(tokens), 'newline', '\n')
-        self.assertIsToken(next(tokens), 'dash', '- ')
-        self.assertIsToken(next(tokens), 'scalar', '-5.4')
+        tokens = self.get_tokens(source)
+        self.assertIsToken(tokens[0], 'dash', '-')
+        self.assertIsToken(tokens[1], 'scalar', '1.2')
+        self.assertIsToken(tokens[-2], 'dash', '-')
+        self.assertIsToken(tokens[-1], 'scalar', '-5.4')
+
+    def test_comma_as_decimal_separator(self):
+        source = '2,4'
+        tokens = self.get_tokens(source)
+        self.assertIsToken(tokens[0], 'scalar', '2,4')
 
     def test_scalars(self):
         source = '\n'.join(['foo', 'http://www.foo.bar', '-0.1'])
-        tokens = list(tokenizer(source))
+        tokens = self.get_tokens(source)
         self.assertIsToken(tokens[0], 'scalar', 'foo')
         self.assertIsToken(tokens[1], 'newline', '\n')
         self.assertIsToken(tokens[2], 'scalar', 'http://www.foo.bar')
@@ -40,18 +54,23 @@ class TokenizerTest(TestCase):
         self.assertIsToken(tokens[4], 'scalar', '-0.1')
 
     def indentation(self):
-        source = '  foo'
-        tokens = list(tokenizer(source))
+        source = '  foo\n    bar'
+        tokens = self.get_tokens(source)
         self.assertIsToken(tokens[0], 'indentation', '   ')
         self.assertIsToken(tokens[1], 'scalar', 'foo')
+        self.assertIsToken(tokens[-2], 'indentation', '    ')
+        self.assertIsToken(tokens[-1], 'scalar', 'bar')
 
     def test_sequences(self):
-        tokens = list(tokenizer('[foo, bar, baz]'))
-        self.assertEqual(len(tokens), 7)
-        self.assertListEqual(
-            ['open_sequence', 'scalar', 'comma', 'scalar', 'comma', 'scalar', 'close_sequence'],
-            [token.type for token in tokens]
-        )
+        source = '[foo, bar, baz]'
+        tokens = self.get_tokens(source)
+        self.assertIsToken(tokens[0], 'open_sequence', '[')
+        self.assertIsToken(tokens[1], 'scalar', 'foo')
+        self.assertIsToken(tokens[2], 'comma', ',')
+        self.assertIsToken(tokens[3], 'scalar', 'bar')
+        self.assertIsToken(tokens[4], 'comma', ',')
+        self.assertIsToken(tokens[5], 'scalar', 'baz')
+        self.assertIsToken(tokens[6], 'close_sequence', ']')
 
     def test_anchors_and_alias(self):
         source = '&foo\n*foo'
@@ -64,7 +83,7 @@ class TokenizerTest(TestCase):
         source = '\n'.join(['foo: |-', '  \//||\/||', '  // ||  ||__'])
         tokens = tokenizer(source)
         self.assertIsToken(next(tokens), 'scalar', 'foo')
-        self.assertIsToken(next(tokens), 'colon', ': ')
+        self.assertIsToken(next(tokens), 'colon', ':')
         self.assertIsToken(next(tokens), 'literal', '|-')
         self.assertIsToken(next(tokens), 'newline', '\n')
         self.assertIsToken(next(tokens), 'indentation', '  ')
@@ -88,8 +107,24 @@ class ParserTest(TestCase):
     def parse(self):
         return Parser().from_file('tests/simple.example.yaml')
 
+    def from_string(self, source):
+        return Parser().parse(source)
+
     def test_mapping(self):
-        result = self.parse()
+        source = '\n'.join((
+            'name: Max Mustermann',
+            'age: 33'
+        ))
+        result = self.from_string(source)
+        self.assertEqual(result['name'], 'Max Mustermann')
+        self.assertEqual(result['age'], '33')
+
+    def test_sequence(self):
+        source = '\n'.join((
+            'name: Max Mustermann',
+            'age: 33'
+        ))
+        result = self.from_string(source)
         self.assertEqual(result['name'], 'Max Mustermann')
         self.assertEqual(result['age'], '33')
         
