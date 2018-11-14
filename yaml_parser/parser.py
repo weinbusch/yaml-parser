@@ -20,10 +20,13 @@ class Parser(object):
     def parse(self, source):
         self.tokenizer = tokenizer(source)
         self.current = None
-        self.next = None
+        self.next = next(self.tokenizer)
         self.advance()
         self.indentation = -1
-        return self.stream()
+        try:
+            return self.stream()
+        except:
+            raise Exception('Parser failed at {}.\nNext token is: {}.'.format(self.current, self.next))
 
     def advance(self):
         self.current, self.next = self.next, next(self.tokenizer, None)
@@ -34,10 +37,7 @@ class Parser(object):
                         ( l-document-suffix+ l-document-prefix* l-any-document?
                         | l-document-prefix* l-explicit-document? )*        
         '''
-        # if not self.current:
-        #     self.advance()
-        # return self.any_document()
-        pass
+        return self.any_document()
 
     def any_document(self):
         '''
@@ -57,7 +57,7 @@ class Parser(object):
         '''
         s-l+block-in-block(n,c) | s-l+flow-in-block(n)
         '''
-        return self.block_in_block(n, c) | self.flow_in_block(n) 
+        return self.block_in_block(n, c) or self.flow_in_block(n) 
 
     def block_in_block(self, n, c):
         '''
@@ -79,17 +79,18 @@ class Parser(object):
         l+block-mapping(n) ::= ( s-indent(n+m) ns-l-block-map-entry(n+m) )+
                        /* For some fixed auto-detected m > 0 */
         '''
+        # We should be either looking at an explicit mapping, i.e. a '?' token
+        # or at an implicit mapping key, i.e. a 'scalar' followed by a 'colon' token. There
+        # should also be next token.
+        # If not, return.
+        if not self.next or (self.current.type != 'complex_mapping_key' and self.next.type != 'colon'):
+            return
         mapping = {}
-        while n <= self.indentation:
+        while n <= self.indentation and self.current:
             self.indent()
             entry = self.block_map_entry(self.indentation)            
             mapping.update(entry)
         return mapping
-
-    def indent(self):
-        if self.current.type == 'indentation':
-            self.indentation = len(self.current.value)
-            self.advance()
 
     def block_map_entry(self, n):
         '''
@@ -112,59 +113,33 @@ class Parser(object):
         '''
         ns-s-block-map-implicit-key ::=   c-s-implicit-json-key(block-key)
                                 | ns-s-implicit-yaml-key(block-key)
-        '''
-        return self.implicit_yaml_key('block-key') # TODO: implicit-json-key
-
-    def implicit_yaml_key(self, c):
-        '''
         ns-s-implicit-yaml-key(c) ::= ns-flow-yaml-node(n/a,c) s-separate-in-line?
                               /* At most 1024 characters altogether */
+        ns-flow-yaml-node(n,c) 	::= 	c-ns-alias-node
+                                        | ns-flow-yaml-content(n,c)
+                                        | ( c-ns-properties(n,c)
+                                            ( ( s-separate(n,c)
+                                                ns-flow-yaml-content(n,c) )
+                                            | e-scalar ) ) 
         '''
-        pass
+        return self.flow_content(1024, 'block-key')
 
     def block_map_implicit_value(self, n):
         '''
         c-l-block-map-implicit-value(n) ::= “:” ( s-l+block-node(n,block-out)
                                         | ( e-node s-l-comments ) )
         '''
-        if self.current.type == 'colon':
-            self.advance()
-            return self.block_node(n, 'block-out') # TODO: e-node, comments
+        if not self.current.type == 'colon':
+            raise Exception('Expected a "colon", found a {}'.format(self.current))
+        self.advance()
+        return self.block_node(n, 'block-out') # TODO: e-node, comments
 
     def flow_in_block(self, n):
         '''
         s-l+flow-in-block(n) ::= s-separate(n+1,flow-out)
                          ns-flow-node(n+1,flow-out) s-l-comments
         '''
-        # self.separate(n+1, 'flow-out') # TODO: separate
-        return self.flow_node(n+1, 'flow-out') # TODO: comments
-
-    def separate(self, n, c):
-        '''
-        s-separate(n,c) ::= c = block-out ⇒ s-separate-lines(n)
-                    c = block-in  ⇒ s-separate-lines(n)
-                    c = flow-out  ⇒ s-separate-lines(n)
-                    c = flow-in   ⇒ s-separate-lines(n)
-                    c = block-key ⇒ s-separate-in-line
-                    c = flow-key  ⇒ s-separate-in-line
-        '''
-        if c in ['block-out', 'block-in', 'flow-out', 'flow-in']:
-            return self.separate_lines(n)
-        elif c in ['block-key', 'flow-key']:
-            return self.separate_in_line()
-
-    def separate_lines(self, n):
-        '''
-        s-separate-lines(n) ::=   ( s-l-comments s-flow-line-prefix(n) )
-                        | s-separate-in-line
-        '''
-        return self.separate_in_line() # TODO: comments flow-line-prefix
-
-    def separate_in_line(self):
-        '''
-        s-separate-in-line ::= s-white+ | /* Start of line */
-        '''
-        pass # TODO: separate-in-line
+        return self.flow_node(n+1, 'flow-out') # TODO: comments, separate
 
     def flow_node(self, n, c):
         '''
@@ -175,4 +150,47 @@ class Parser(object):
                               ns-flow-content(n,c) )
                             | e-scalar ) )
         '''
-        return self.flow_content(n, c) # TODO: 
+        return self.flow_content(n, c) # TODO: alias, properties, separate, e-scalar
+
+    def flow_content(self, n, c):
+        '''
+        ns-flow-content(n,c) 	::= 	ns-flow-yaml-content(n,c) | c-flow-json-content(n,c)
+        ns-flow-yaml-content(n,c) 	::= 	ns-plain(n,c)
+        ns-plain(n,c) 	::= 	c = flow-out  ⇒ ns-plain-multi-line(n,c)
+                                c = flow-in   ⇒ ns-plain-multi-line(n,c)
+                                c = block-key ⇒ ns-plain-one-line(c)
+                                c = flow-key  ⇒ ns-plain-one-line(c)
+        ns-plain-multi-line(n,c) 	::= 	ns-plain-one-line(c)
+                                            s-ns-plain-next-line(n,c)* 
+        s-ns-plain-next-line(n,c) 	::= 	s-flow-folded(n)
+                                            ns-plain-char(c) nb-ns-plain-in-line(c)
+        ns-plain-one-line(c) 	::= 	ns-plain-first(c) nb-ns-plain-in-line(c)
+        ns-plain-first(c) 	::= 	( ns-char - c-indicator )
+                                    | ( ( “?” | “:” | “-” )
+                                    /* Followed by an ns-plain-safe(c)) */ ) 
+        nb-ns-plain-in-line(c) 	::= 	( s-white* ns-plain-char(c) )* 
+        '''
+        if c in ['flow-out', 'flow-in']:
+            # TODO: Handle multi-line
+            if not self.current.type == 'scalar':
+                raise Exception('Expected a "scalar" found a {}'.format(self.current))
+            return self.consume_and_advance()
+        elif c in ['block-key', 'flow-key']:
+            if not self.current.type == 'scalar':
+                raise Exception('Expected a "scalar" found a {}'.format(self.current))
+            return self.consume_and_advance()
+        else:
+            raise Exception('Invalid value for c: "{}"'.format(c))
+
+    def indent(self):
+        if self.current.type == 'newline':
+            self.indentation = 0
+            self.advance()
+        if self.current.type == 'indentation':
+            self.indentation = len(self.current.value)
+            self.advance()
+
+    def consume_and_advance(self):
+        output = self.current.value
+        self.advance()
+        return output

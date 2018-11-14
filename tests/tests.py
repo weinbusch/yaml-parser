@@ -116,44 +116,7 @@ class ParserTest(TestCase):
             'age: 33'
         ))
         result = self.from_string(source)
-        self.assertEqual(result['name'], 'Max Mustermann')
-        self.assertEqual(result['age'], '33')
-
-    def test_sequence(self):
-        source = '\n'.join((
-            'name: Max Mustermann',
-            'age: 33'
-        ))
-        result = self.from_string(source)
-        self.assertEqual(result['name'], 'Max Mustermann')
-        self.assertEqual(result['age'], '33')
-        
-    def test_nested_list(self):
-        result = self.parse()
-        self.assertListEqual(
-            result['cities'],
-            ['London', 'Paris', 'Bochum']
-        )        
-
-    def test_nested_mapping(self):
-        result = self.parse()
         self.assertDictEqual(
-            result['address'],
-            {
-                'street': 'Musterstraße 1',
-                'city': 'Musterstadt'
-            }
-        )        
-
-    def test_nested_list_with_mappings(self):
-        result = self.parse()
-        self.assertEqual(len(result['teams']), 2)        
-        self.assertDictEqual(
-            result['teams'][0],
-            {
-                'name': 'Vfl Bochum',
-                'manager': 'Robin Dutt',
-                'league': 'Champions League',
-                'players': ['Lionel Messi', 'Christiano Ronaldo', 'Theofanis Gekas']
-            }
+            result,
+            dict(name='Max Mustermann', age='33')
         )
