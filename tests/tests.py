@@ -131,3 +131,59 @@ class ParserTest(TestCase):
         self.assertListEqual(
             result, ['London', 'Paris', 'Bochum']
         )
+
+    def test_mapping_inside_mapping(self):
+        source = '\n'.join([
+            'name: Max Mustermann',
+            'address:',
+            '  street: Musterstraße',
+            '  city: Neustadt',
+            'age: 33'
+        ])
+        result = self.from_string(source)
+        self.assertDictEqual(
+            result,
+            dict(name='Max Mustermann', address=dict(street='Musterstraße', city='Neustadt'), age='33')
+        )
+
+    def test_list_inside_mapping(self):
+        source = '\n'.join([
+            'name: Max Mustermann',
+            'friends:',
+            '  - Fritz',
+            '  - Moritz',
+            'age: 33'
+        ])
+        result = self.from_string(source)
+        self.assertDictEqual(
+            result,
+            dict(name='Max Mustermann', friends=['Fritz', 'Moritz'], age='33')
+        )
+
+    def test_list_inside_list(self):
+        source = '\n'.join([
+            '- Max',
+            '-',
+            '  - Fritz',
+            '  - Moritz',
+            '- Franz'
+        ])
+        result = self.from_string(source)
+        self.assertListEqual(
+            result,
+            ['Max', ['Fritz', 'Moritz'], 'Franz']
+        )
+
+    def test_mapping_inside_list(self):
+        source = '\n'.join([
+            '- Max Mustermann',
+            '-',
+            '  street: Musterstraße',
+            '  city: Neustadt',
+            '- 33'
+        ])
+        result = self.from_string(source)
+        self.assertListEqual(
+            result,
+            ['Max Mustermann', dict(street='Musterstraße', city='Neustadt'), '33']
+        )

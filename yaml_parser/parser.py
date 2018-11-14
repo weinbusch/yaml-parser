@@ -1,13 +1,9 @@
 
 from .tokenizer import tokenizer
 
-''' YAML grammar
-
-stream ::= document
-document ::= block_content
-block_content ::= block_sequence | block_mapping | scalar
-block_sequence ::= BLOCK_START (DASH block_node)* BLOCK_END
-block_mapping ::= BLOCK_START (block_node ": " block_node)* BLOCK_END
+'''
+Recursive descent parser based on YAML grammar according to 
+    	http://yaml.org/spec/1.2/spec.html#Syntax
 '''
 
 class Parser(object):
@@ -76,7 +72,20 @@ class Parser(object):
                               s-l-comments
                               ( l+block-sequence(seq-spaces(n,c))
                               | l+block-mapping(n) )
+        s-separate(n,c) 	::= 	c = block-out ⇒ s-separate-lines(n)
+                                    c = block-in  ⇒ s-separate-lines(n)
+                                    c = flow-out  ⇒ s-separate-lines(n)
+                                    c = flow-in   ⇒ s-separate-lines(n)
+                                    c = block-key ⇒ s-separate-in-line
+                                    c = flow-key  ⇒ s-separate-in-line
+        s-separate-lines(n) 	::= 	  ( s-l-comments s-flow-line-prefix(n) )
+                                          | s-separate-in-line
+        s-separate-in-line 	::= 	s-white+ | /* Start of line */ 
+        s-l-comments 	::= 	( s-b-comment | /* Start of line */ )
+                                l-comment* 
+        s-flow-line-prefix(n) 	::= 	s-indent(n) s-separate-in-line?
         '''
+        self.indent()
         return self.block_mapping(n) or self.block_sequence(n) # TODO: comments, properties, separate
 
     def block_mapping(self, n):
@@ -90,9 +99,12 @@ class Parser(object):
         if self.current.type != 'complex_mapping_key' and (self.next == None or self.next.type != 'colon'):
             return
         mapping = {}
-        while n <= self.indentation and self.current:
+        n_plus_m = self.indentation
+        while self.current:
             self.indent()
-            entry = self.block_map_entry(self.indentation)            
+            if self.indentation < n_plus_m:
+                break
+            entry = self.block_map_entry(n_plus_m)            
             mapping.update(entry)
         return mapping
 
@@ -147,8 +159,11 @@ class Parser(object):
         if self.current.type != 'dash':
             return 
         sequence = []
-        while n <= self.indentation and self.current:
+        n_plus_m = self.indentation
+        while self.current:
             self.indent()
+            if self.indentation < n_plus_m:
+                break
             entry = self.block_seq_entry(self.indentation)            
             sequence.append(entry)
         return sequence
