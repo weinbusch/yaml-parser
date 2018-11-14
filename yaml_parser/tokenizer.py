@@ -15,7 +15,7 @@ PATTERNS = [
     r'(?P<close_mapping>\})',
     r'(?P<comma>,(?=.*\]))',
     # Structures
-    r'(?P<directive>^---\s*)',
+    r'(?P<directive>^---)',
     r'(?P<end_of_document>^\.\.\.)',
     r'(?P<anchor>&\w*)',
     r'(?P<alias>\*\w*)',
@@ -23,7 +23,9 @@ PATTERNS = [
     # Scalars
     r'(?P<literal>\|[-+]?$)',
     r'(?P<folded>\>$)',
-    r'(?P<scalar>[^,:&*#\s]([^:,\n\r\]\[]|:(?=\S)|,(?=\S))*)',
+    r'(?P<scalar>[^,:&*#!\s]([^:,\n\r\]\[]|:(?=\S)|,(?=\S))*)',
+    # Tags
+    r'(?P<tag>!.+)',
 ]
 
 MASTER_PATTERN = re.compile('|'.join(PATTERNS), re.MULTILINE)
@@ -31,12 +33,12 @@ MASTER_PATTERN = re.compile('|'.join(PATTERNS), re.MULTILINE)
 Token = collections.namedtuple('Token', ['type', 'value', 'line', 'column'])
 
 def tokenizer(source, pattern=MASTER_PATTERN):
-    line = 0
+    line = 1
     linestart = 0
     for m in pattern.finditer(source):
         kind = m.lastgroup
         value = m.group()
-        column = m.start() - linestart
+        column = m.start() - linestart + 1
         token = Token(kind, value, line, column)
         if token.type == 'newline':
             line += 1
@@ -75,6 +77,8 @@ TOKEN_STYLES = {
     'literal': Back.MAGENTA,
     'folded': Back.MAGENTA,
     'scalar': Back.GREEN,
+    # Tags
+    'tag': Back.LIGHTRED_EX + Fore.CYAN,
 }
 
 def print_token(token):

@@ -99,8 +99,8 @@ class TokenizerTest(TestCase):
             'three: foobar']
         )
         tokens = list(tokenizer(source))
-        self.assertIsToken(tokens[5], 'colon', line=1, column=3)
-        self.assertIsToken(tokens[10], 'scalar', 'foobar', line=2, column=7)
+        self.assertIsToken(tokens[5], 'colon', line=2, column=4)
+        self.assertIsToken(tokens[10], 'scalar', 'foobar', line=3, column=8)
 
 class ParserTest(TestCase):
 
@@ -186,4 +186,28 @@ class ParserTest(TestCase):
         self.assertListEqual(
             result,
             ['Max Mustermann', dict(street='Musterstraße', city='Neustadt'), '33']
+        )
+
+    def test_explicit_document(self):
+        source = '\n'.join([
+            '---',
+            '- London',
+            '- Paris',
+            '- Bochum',
+        ])
+        result = self.from_string(source)
+        self.assertListEqual(
+            result, ['London', 'Paris', 'Bochum']
+        )
+
+    def test_ignore_tag(self):
+        source = '\n'.join([
+            '--- !<http://foo.bar>',
+            '- London',
+            '- Paris',
+            '- Bochum',
+        ])
+        result = self.from_string(source)
+        self.assertListEqual(
+            result, ['London', 'Paris', 'Bochum']
         )
