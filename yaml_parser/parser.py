@@ -22,107 +22,157 @@ class Parser(object):
         self.current = None
         self.next = None
         self.advance()
-        self.indentation = 0
+        self.indentation = -1
         return self.stream()
 
     def advance(self):
         self.current, self.next = self.next, next(self.tokenizer, None)
 
     def stream(self):
-        if not self.current:
-            self.advance()
-        return self.document()
-
-    def document(self):
-        return self.block_content()
-
-    def block_content(self):
         '''
-        block_content :== block_mapping | block_sequence | scalar
+        l-yaml-stream ::= l-document-prefix* l-any-document?
+                        ( l-document-suffix+ l-document-prefix* l-any-document?
+                        | l-document-prefix* l-explicit-document? )*        
         '''
+        # if not self.current:
+        #     self.advance()
+        # return self.any_document()
+        pass
 
-        # First check indentation; 
-        # this skips over a single newline and a single indentation token
-        self.check_indentation()
-
-        # Continue with analysing the current token
-        # it can be a mapping
-        if self.next and self.next.type == 'colon':
-            return self.block_mapping()
-        # or a sequence
-        if self.current.type == 'dash':
-            return self.block_sequence()
-        # or a scalar
-        if self.current.type == 'scalar':
-            return self.scalar()
-        
-        raise Exception('Could not parse block content at {}'.format(self.current))
-
-    def check_indentation(self):
-        # If a newline is encountered, 
-        if self.current.type == 'newline':
-            # advance to next token.
-            self.advance()
-            # If this token is an indentation
-            if self.current.type == 'indentation':
-                # Assign self.indentation 
-                self.indentation = len(self.current.value)
-                # Advance to next token
-                self.advance()
-            else:
-                # If newline is followed by something else, 
-                # self.indentation is 0
-                self.indentation = 0
-                # Continue with the current token
-
-    def scalar(self):
+    def any_document(self):
         '''
-        Return scalar value
+        l-any-document ::=   l-directive-document
+                   | l-explicit-document
+                   | l-bare-document
         '''
-        value = self.current.value
-        self.advance()
-        return value
+        return self.bare_document() # TODO: directive-document and explicit-document
 
-    def block_sequence(self):
+    def bare_document(self):
         '''
-        block_sequence :== BLOCK_START ("- " block_content)* BLOCK_END
+        l-bare-document ::= s-l+block-node(-1,block-in)
         '''
-        sequence = []
-        block_level = self.indentation
-        while self.current:
-            self.check_indentation()
-            if self.block_end(block_level):
-                break
-            # We should be looking at a dash
-            if not self.current.type == 'dash':
-                raise Exception('Malformed token at {}. Expected "dash"'.format(self.current))
-            self.advance()
-            value = self.block_content()
-            sequence.append(value)
-        return sequence
+        return self.block_node(-1, 'block-in')
 
-    def block_mapping(self):
+    def block_node(self, n, c):
         '''
-        block_mapping:== BLOCK_START (scalar ": " block_content)* BLOCK_END
+        s-l+block-in-block(n,c) | s-l+flow-in-block(n)
+        '''
+        return self.block_in_block(n, c) | self.flow_in_block(n) 
+
+    def block_in_block(self, n, c):
+        '''
+        s-l+block-in-block(n,c) ::= s-l+block-scalar(n,c) | s-l+block-collection(n,c)
+        '''
+        return self.block_collection(n, c) # TODO: block-scalar
+
+    def block_collection(self, n, c):
+        '''
+        s-l+block-collection(n,c) ::= ( s-separate(n+1,c) c-ns-properties(n+1,c) )?
+                              s-l-comments
+                              ( l+block-sequence(seq-spaces(n,c))
+                              | l+block-mapping(n) )
+        '''
+        return self.block_mapping(n) # TODO: block-sequence, comments, properties, separate
+
+    def block_mapping(self, n):
+        '''
+        l+block-mapping(n) ::= ( s-indent(n+m) ns-l-block-map-entry(n+m) )+
+                       /* For some fixed auto-detected m > 0 */
         '''
         mapping = {}
-        block_level = self.indentation
-        while self.current:
-            # Update indentation, also skips a single newline and a single indentations
-            self.check_indentation()
-            if self.block_end(block_level) or not self.next:
-                break
-            if not self.next.type == 'colon' or not self.current.type=='scalar':
-                raise Exception(
-                    'Malformed mapping key at {}'.format(self.current)
-                )
-            key = self.scalar()
-            # Implicitly advances to the next token, which is the colon
-            # Advance to the next token, which is the value
-            self.advance()
-            mapping[key] = self.block_content()
+        while n <= self.indentation:
+            self.indent()
+            entry = self.block_map_entry(self.indentation)            
+            mapping.update(entry)
         return mapping
 
-    def block_end(self, level=0):
-        # If current indentation is < block_level, we have reached the end of the current block
-        return self.indentation < level
+    def indent(self):
+        if self.current.type == 'indentation':
+            self.indentation = len(self.current.value)
+            self.advance()
+
+    def block_map_entry(self, n):
+        '''
+        ns-l-block-map-entry(n) ::=   c-l-block-map-explicit-entry(n)
+                            | ns-l-block-map-implicit-entry(n)
+        '''
+        return self.block_map_implicit_entry(n) # TODO: block-map-explicit-entry
+        
+    def block_map_implicit_entry(self, n):
+        '''
+        ns-l-block-map-implicit-entry(n) ::= ( ns-s-block-map-implicit-key
+                                     | e-node )
+                                     c-l-block-map-implicit-value(n)
+        '''
+        key = self.block_map_implicit_key() # TODO: e-node
+        value = self.block_map_implicit_value(n)
+        return {key: value} # TODO: e-node
+
+    def block_map_implicit_key(self):
+        '''
+        ns-s-block-map-implicit-key ::=   c-s-implicit-json-key(block-key)
+                                | ns-s-implicit-yaml-key(block-key)
+        '''
+        return self.implicit_yaml_key('block-key') # TODO: implicit-json-key
+
+    def implicit_yaml_key(self, c):
+        '''
+        ns-s-implicit-yaml-key(c) ::= ns-flow-yaml-node(n/a,c) s-separate-in-line?
+                              /* At most 1024 characters altogether */
+        '''
+        pass
+
+    def block_map_implicit_value(self, n):
+        '''
+        c-l-block-map-implicit-value(n) ::= “:” ( s-l+block-node(n,block-out)
+                                        | ( e-node s-l-comments ) )
+        '''
+        if self.current.type == 'colon':
+            self.advance()
+            return self.block_node(n, 'block-out') # TODO: e-node, comments
+
+    def flow_in_block(self, n):
+        '''
+        s-l+flow-in-block(n) ::= s-separate(n+1,flow-out)
+                         ns-flow-node(n+1,flow-out) s-l-comments
+        '''
+        # self.separate(n+1, 'flow-out') # TODO: separate
+        return self.flow_node(n+1, 'flow-out') # TODO: comments
+
+    def separate(self, n, c):
+        '''
+        s-separate(n,c) ::= c = block-out ⇒ s-separate-lines(n)
+                    c = block-in  ⇒ s-separate-lines(n)
+                    c = flow-out  ⇒ s-separate-lines(n)
+                    c = flow-in   ⇒ s-separate-lines(n)
+                    c = block-key ⇒ s-separate-in-line
+                    c = flow-key  ⇒ s-separate-in-line
+        '''
+        if c in ['block-out', 'block-in', 'flow-out', 'flow-in']:
+            return self.separate_lines(n)
+        elif c in ['block-key', 'flow-key']:
+            return self.separate_in_line()
+
+    def separate_lines(self, n):
+        '''
+        s-separate-lines(n) ::=   ( s-l-comments s-flow-line-prefix(n) )
+                        | s-separate-in-line
+        '''
+        return self.separate_in_line() # TODO: comments flow-line-prefix
+
+    def separate_in_line(self):
+        '''
+        s-separate-in-line ::= s-white+ | /* Start of line */
+        '''
+        pass # TODO: separate-in-line
+
+    def flow_node(self, n, c):
+        '''
+        ns-flow-node(n,c) ::=   c-ns-alias-node
+                      | ns-flow-content(n,c)
+                      | ( c-ns-properties(n,c)
+                          ( ( s-separate(n,c)
+                              ns-flow-content(n,c) )
+                            | e-scalar ) )
+        '''
+        return self.flow_content(n, c) # TODO: 
