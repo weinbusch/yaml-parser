@@ -111,12 +111,23 @@ class ParserTest(TestCase):
         return Parser().parse(source)
 
     def test_mapping(self):
-        source = '\n'.join((
+        source = '\n'.join([
             'name: Max Mustermann',
             'age: 33'
-        ))
+        ])
         result = self.from_string(source)
         self.assertDictEqual(
             result,
             dict(name='Max Mustermann', age='33')
+        )
+
+    def test_sequence(self):
+        source = '\n'.join([
+            '- London',
+            '- Paris',
+            '- Bochum',
+        ])
+        result = self.from_string(source)
+        self.assertListEqual(
+            result, ['London', 'Paris', 'Bochum']
         )

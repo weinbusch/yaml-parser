@@ -31,6 +31,11 @@ class Parser(object):
     def advance(self):
         self.current, self.next = self.next, next(self.tokenizer, None)
 
+    def consume_and_advance(self):
+        output = self.current.value
+        self.advance()
+        return output
+
     def stream(self):
         '''
         l-yaml-stream ::= l-document-prefix* l-any-document?
@@ -72,7 +77,7 @@ class Parser(object):
                               ( l+block-sequence(seq-spaces(n,c))
                               | l+block-mapping(n) )
         '''
-        return self.block_mapping(n) # TODO: block-sequence, comments, properties, separate
+        return self.block_mapping(n) or self.block_sequence(n) # TODO: comments, properties, separate
 
     def block_mapping(self, n):
         '''
@@ -80,10 +85,9 @@ class Parser(object):
                        /* For some fixed auto-detected m > 0 */
         '''
         # We should be either looking at an explicit mapping, i.e. a '?' token
-        # or at an implicit mapping key, i.e. a 'scalar' followed by a 'colon' token. There
-        # should also be next token.
+        # or at an implicit mapping key, i.e. a 'scalar' followed by a 'colon' token. 
         # If not, return.
-        if not self.next or (self.current.type != 'complex_mapping_key' and self.next.type != 'colon'):
+        if self.current.type != 'complex_mapping_key' and (self.next == None or self.next.type != 'colon'):
             return
         mapping = {}
         while n <= self.indentation and self.current:
@@ -133,6 +137,37 @@ class Parser(object):
             raise Exception('Expected a "colon", found a {}'.format(self.current))
         self.advance()
         return self.block_node(n, 'block-out') # TODO: e-node, comments
+
+    def block_sequence(self, n):
+        '''
+        l+block-sequence(n) 	::= 	( s-indent(n+m) c-l-block-seq-entry(n+m) )+
+                                        /* For some fixed auto-detected m > 0 */ 
+        '''
+        # We expect looking at a dash
+        if self.current.type != 'dash':
+            return 
+        sequence = []
+        while n <= self.indentation and self.current:
+            self.indent()
+            entry = self.block_seq_entry(self.indentation)            
+            sequence.append(entry)
+        return sequence
+
+    def block_seq_entry(self, n):
+        '''
+        c-l-block-seq-entry(n) 	::= 	“-” /* Not followed by an ns-char */
+                                        s-l+block-indented(n,block-in)
+        s-l+block-indented(n,c) 	::= 	  ( s-indent(m)
+                                            ( ns-l-compact-sequence(n+1+m)
+                                            | ns-l-compact-mapping(n+1+m) ) )
+                                            | s-l+block-node(n,c)
+                                            | ( e-node s-l-comments )
+        '''
+        if not self.current.type == 'dash':
+            raise Exception('Expected a "dash", found a {}'.format(self.current))
+        self.advance()
+        self.indent()
+        return self.block_node(n, 'block-in') # TODO: compact-sequence, compact-mapping, e-node, comments
 
     def flow_in_block(self, n):
         '''
@@ -189,8 +224,3 @@ class Parser(object):
         if self.current.type == 'indentation':
             self.indentation = len(self.current.value)
             self.advance()
-
-    def consume_and_advance(self):
-        output = self.current.value
-        self.advance()
-        return output
