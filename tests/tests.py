@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from yaml_parser.tokenizer import tokenizer
+from yaml_parser.tokenizer import tokenizer, string_tokenizer, file_tokenizer
 from yaml_parser.parser import Parser
 
 class TokenizerTest(TestCase):
@@ -16,6 +16,11 @@ class TokenizerTest(TestCase):
 
     def get_tokens(self, source):
         return list(tokenizer(source))
+
+    def test_from_string(self):
+        source = 'url: http://www.foo.bar\ntitle: Hello World!'
+        tokens = list(string_tokenizer(source))
+        self.assertEqual(len(tokens, 7))
 
     def test_colon_inline(self):
         source = 'url: http://www.foo.bar'
