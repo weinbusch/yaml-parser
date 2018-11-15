@@ -28,7 +28,7 @@ PATTERNS = [
     r'(?P<tag>!.+)',
 ]
 
-MASTER_PATTERN = re.compile('|'.join(PATTERNS), re.MULTILINE)
+MASTER_PATTERN = re.compile('|'.join(PATTERNS))
 
 Token = collections.namedtuple('Token', ['type', 'value', 'line', 'column'])
 
