@@ -1,5 +1,5 @@
 
-from .tokenizer import tokenizer
+from .tokenizer import file_tokenizer, string_tokenizer
 
 '''
 Recursive descent parser based on YAML grammar according to 
@@ -9,15 +9,14 @@ Recursive descent parser based on YAML grammar according to
 class Parser(object):
 
     def from_file(self, filename, encoding='utf8'):
-        with open(filename, 'r', encoding=encoding) as f:
-            source = f.read()
-        return self.parse(source)
+        self.tokenizer = file_tokenizer(filename)
+        return self.parse()
 
     def from_string(self, source):
-        return self.parse(source)
+        self.tokenizer = string_tokenizer(source)
+        return self.parse()
 
-    def parse(self, source):
-        self.tokenizer = tokenizer(source)
+    def parse(self):
         self.current = None
         self.next = next(self.tokenizer)
         self.advance()

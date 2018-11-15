@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from yaml_parser.tokenizer import tokenizer, string_tokenizer, file_tokenizer
+from yaml_parser.tokenizer import string_tokenizer, file_tokenizer
 from yaml_parser.parser import Parser
 
 class TokenizerTest(TestCase):
@@ -15,12 +15,12 @@ class TokenizerTest(TestCase):
             self.assertEqual(token.column, column)
 
     def get_tokens(self, source):
-        return list(tokenizer(source))
+        return list(string_tokenizer(source))
 
     def test_from_string(self):
         source = 'url: http://www.foo.bar\ntitle: Hello World!'
         tokens = list(string_tokenizer(source))
-        self.assertEqual(len(tokens, 7))
+        self.assertEqual(len(tokens), 7)
 
     def test_colon_inline(self):
         source = 'url: http://www.foo.bar'
@@ -79,14 +79,14 @@ class TokenizerTest(TestCase):
 
     def test_anchors_and_alias(self):
         source = '&foo\n*foo'
-        tokens = tokenizer(source)
+        tokens = string_tokenizer(source)
         self.assertIsToken(next(tokens), 'anchor', '&foo')
         self.assertIsToken(next(tokens), 'newline', '\n')
         self.assertIsToken(next(tokens), 'alias', '*foo')
         
     def test_literal(self):
         source = '\n'.join(['foo: |-', '  \//||\/||', '  // ||  ||__'])
-        tokens = tokenizer(source)
+        tokens = string_tokenizer(source)
         self.assertIsToken(next(tokens), 'scalar', 'foo')
         self.assertIsToken(next(tokens), 'colon', ':')
         self.assertIsToken(next(tokens), 'literal', '|-')
@@ -103,7 +103,7 @@ class TokenizerTest(TestCase):
             'two: bar',
             'three: foobar']
         )
-        tokens = list(tokenizer(source))
+        tokens = list(string_tokenizer(source))
         self.assertIsToken(tokens[5], 'colon', line=2, column=4)
         self.assertIsToken(tokens[10], 'scalar', 'foobar', line=3, column=8)
 
