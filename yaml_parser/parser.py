@@ -1,5 +1,5 @@
 
-from .tokenizer import tokenizer
+from .tokenizer import file_tokenizer, string_tokenizer
 
 '''
 Recursive descent parser based on YAML grammar according to 
@@ -9,12 +9,14 @@ Recursive descent parser based on YAML grammar according to
 class Parser(object):
 
     def from_file(self, filename, encoding='utf8'):
-        with open(filename, 'r', encoding=encoding) as f:
-            source = f.read()
-        return self.parse(source)
+        self.tokenizer = file_tokenizer(filename)
+        return self.parse()
 
-    def parse(self, source):
-        self.tokenizer = tokenizer(source)
+    def from_string(self, source):
+        self.tokenizer = string_tokenizer(source)
+        return self.parse()
+
+    def parse(self):
         self.current = None
         self.next = next(self.tokenizer)
         self.advance()
@@ -26,6 +28,9 @@ class Parser(object):
 
     def advance(self):
         self.current, self.next = self.next, next(self.tokenizer, None)
+        # skip some tokens:
+        while self.current and self.current.type in ['tag']:
+            self.advance()
 
     def consume_and_advance(self):
         output = self.current.value
@@ -46,13 +51,25 @@ class Parser(object):
                    | l-explicit-document
                    | l-bare-document
         '''
-        return self.bare_document() # TODO: directive-document and explicit-document
+        return self.explicit_document() or self.bare_document() # TODO: directive-document
 
     def bare_document(self):
         '''
         l-bare-document ::= s-l+block-node(-1,block-in)
         '''
         return self.block_node(-1, 'block-in')
+
+    def explicit_document(self):
+        '''
+        l-explicit-document 	::= 	c-directives-end
+                                        ( l-bare-document
+                                        | ( e-node s-l-comments ) ) 
+        c-directives-end 	::= 	“-” “-” “-”
+        '''
+        if self.current.value != '---':
+            return
+        self.advance()
+        return self.bare_document() # TODO: e-node, comments
 
     def block_node(self, n, c):
         '''

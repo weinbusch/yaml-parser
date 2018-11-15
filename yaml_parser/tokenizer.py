@@ -15,7 +15,7 @@ PATTERNS = [
     r'(?P<close_mapping>\})',
     r'(?P<comma>,(?=.*\]))',
     # Structures
-    r'(?P<directive>^---\s*)',
+    r'(?P<directive>^---)',
     r'(?P<end_of_document>^\.\.\.)',
     r'(?P<anchor>&\w*)',
     r'(?P<alias>\*\w*)',
@@ -23,32 +23,42 @@ PATTERNS = [
     # Scalars
     r'(?P<literal>\|[-+]?$)',
     r'(?P<folded>\>$)',
-    r'(?P<scalar>[^,:&*#\s]([^:,\n\r\]\[]|:(?=\S)|,(?=\S))*)',
+    r'(?P<scalar>[^,:&*#!\s]([^:,\n\r\]\[]|:(?=\S)|,(?=\S))*)',
+    # Tags
+    r'(?P<tag>!.+)',
 ]
 
 MASTER_PATTERN = re.compile('|'.join(PATTERNS), re.MULTILINE)
 
 Token = collections.namedtuple('Token', ['type', 'value', 'line', 'column'])
 
-def tokenizer(source, pattern=MASTER_PATTERN):
-    line = 0
-    linestart = 0
-    for m in pattern.finditer(source):
+def file_tokenizer(filename, pattern=MASTER_PATTERN):
+    with open(filename, 'r', encoding='utf8') as f:
+        lineno = 1
+        for line in f:
+            for token in line_tokenizer(line, lineno, pattern):
+                yield token
+            lineno += 1
+
+def string_tokenizer(source, pattern=MASTER_PATTERN):
+    lineno = 1
+    for line in source.splitlines(keepends=True):
+        for token in line_tokenizer(line, lineno, pattern):
+            yield token
+        lineno +=1
+
+def line_tokenizer(line, lineno, pattern=MASTER_PATTERN):
+    for m in pattern.finditer(line):
         kind = m.lastgroup
         value = m.group()
-        column = m.start() - linestart
-        token = Token(kind, value, line, column)
-        if token.type == 'newline':
-            line += 1
-            linestart = m.end()
+        column = m.start() + 1
+        token = Token(kind, value, lineno, column)
         yield token
 
 def prettyprint(filename, encoding='utf8'):
-    with open(filename, 'r', encoding=encoding) as f:
-        source = f.read()
     init()
     try:
-        for token in tokenizer(source):
+        for token in file_tokenizer(filename):
             print_token(token)
         print()
     finally:
@@ -75,6 +85,8 @@ TOKEN_STYLES = {
     'literal': Back.MAGENTA,
     'folded': Back.MAGENTA,
     'scalar': Back.GREEN,
+    # Tags
+    'tag': Back.LIGHTRED_EX + Fore.CYAN,
 }
 
 def print_token(token):
