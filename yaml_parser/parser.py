@@ -13,6 +13,9 @@ class Parser(object):
             source = f.read()
         return self.parse(source)
 
+    def from_string(self, source):
+        return self.parse(source)
+
     def parse(self, source):
         self.tokenizer = tokenizer(source)
         self.current = None

@@ -104,11 +104,15 @@ class TokenizerTest(TestCase):
 
 class ParserTest(TestCase):
 
-    def parse(self):
-        return Parser().from_file('tests/simple.example.yaml')
-
     def from_string(self, source):
-        return Parser().parse(source)
+        return Parser().from_string(source)
+
+    def test_example_file(self):
+        filename = 'tests/simple.example.yaml'
+        result = Parser().from_file(filename)
+        self.assertEqual(
+            result['teams'][0]['league'], 'Champions League'
+        )
 
     def test_mapping(self):
         source = '\n'.join([
