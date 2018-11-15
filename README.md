@@ -1,4 +1,4 @@
-# A YAML parser for python
+# A YAML parser for Python
 
 ## Usage
 
@@ -12,7 +12,6 @@ result = load(filename)
 print(result)
 
 # Print a colored version of the .yaml file
-from yaml_parser import prettyprint
 prettyprint(filename)
 ```
 
