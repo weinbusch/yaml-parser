@@ -2,28 +2,47 @@
 import re, collections
 from colorama import Fore, Back, init, deinit
 
+INDICATOR_CHARACTERS = "-?:,[]{}#&*!|>'%@`" + '"'
+INSIDE_FORBIDDEN = ":,[]{}#"
+
+'''
+Plain scalars must never contain the “: ” and “ #” character combinations. 
+Such combinations would cause ambiguity with mapping key: value pairs and comments. 
+In addition, inside flow collections, or when used as implicit keys, plain scalars 
+must not contain the “[”, “]”, “{”, “}” and “,” characters. These characters would 
+cause ambiguity with flow collection structures. 
+'''
+
 PATTERNS = [
-    # Collections
-    r'(?P<indentation>(^ +))',
+    # Whitespace
+    r'(?P<indentation>(^[ \t]+))',
     r'(?P<newline>[\r\n])',
-    r'(?P<comment># .*)',
-    r'(?P<dash>(\-(?=\s)))',
-    r'(?P<colon>(\:(?=\s)))',
+    r'(?P<empty_line>^[ \t]*[\n\r])',
+    # Comments
+    r'(?P<comment>#(?<=\s)[^\n\r]*)',
+    # Block indicators
+    r'(?P<colon>(:(?=\s)))',
+    r'(?P<dash>(-(?=\s)))',
+    r'(?P<complex_mapping_key>\?)',
+    r'(?P<literal>\|[-+]?)',
+    r'(?P<folded>\>)',
+    # Flow indicators
     r'(?P<open_sequence>\[)',
     r'(?P<close_sequence>\])',
     r'(?P<open_mapping>\{)',
     r'(?P<close_mapping>\})',
-    r'(?P<comma>,(?=.*\]))',
-    # Structures
-    r'(?P<directive>^---)',
-    r'(?P<end_of_document>^\.\.\.)',
+    r'(?P<comma>,)',
+    # Directives
+    r'(?P<directive>---)',
+    r'(?P<end_of_document>\.\.\.)',
+    # Anchor and alias
     r'(?P<anchor>&\w*)',
     r'(?P<alias>\*\w*)',
-    r'(?P<complex_mapping_key>^\? )',
     # Scalars
-    r'(?P<literal>\|[-+]?$)',
-    r'(?P<folded>\>$)',
-    r'(?P<scalar>[^,:&*#!\s]([^:,\n\r\]\[]|:(?=\S)|,(?=\S))*)',
+    r'(?P<scalar>([^{indicator_characters}\s]|[-?:,](?!\s))([^{inside_forbidden}\n\r]|#(?<![ ])|[:](?!\s))*)'.format(
+        indicator_characters = re.escape(INDICATOR_CHARACTERS),
+        inside_forbidden = re.escape(INSIDE_FORBIDDEN)
+    ),
     # Tags
     r'(?P<tag>!.+)',
 ]
