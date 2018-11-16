@@ -44,19 +44,18 @@ class TokenizerTest(TestCase):
         self.assertIsToken(tokens[-2], 'dash', '-')
         self.assertIsToken(tokens[-1], 'scalar', '-5.4')
 
-    def test_comma_as_decimal_separator(self):
-        source = '2,4'
+    def test_plain_scalars(self):
+        source = '\n'.join((
+            '::vector',
+            'Up, up, and away!',
+            '-123',
+            'http://example.com/foo#bar',
+        ))
         tokens = self.get_tokens(source)
-        self.assertIsToken(tokens[0], 'scalar', '2,4')
-
-    def test_scalars(self):
-        source = '\n'.join(['foo', 'http://www.foo.bar', '-0.1'])
-        tokens = self.get_tokens(source)
-        self.assertIsToken(tokens[0], 'scalar', 'foo')
-        self.assertIsToken(tokens[1], 'newline', '\n')
-        self.assertIsToken(tokens[2], 'scalar', 'http://www.foo.bar')
-        self.assertIsToken(tokens[3], 'newline', '\n')
-        self.assertIsToken(tokens[4], 'scalar', '-0.1')
+        self.assertIsToken(tokens[0], 'scalar', '::vector')
+        self.assertIsToken(tokens[2], 'scalar', 'Up, up, and away!')
+        self.assertIsToken(tokens[4], 'scalar', '-123')
+        self.assertIsToken(tokens[6], 'scalar', 'http://example.com/foo#bar')
 
     def indentation(self):
         source = '  foo\n    bar'
@@ -219,4 +218,17 @@ class ParserTest(TestCase):
         result = self.from_string(source)
         self.assertListEqual(
             result, ['London', 'Paris', 'Bochum']
+        )
+
+    def test_block_list_of_plain_scalars(self):
+        source = '\n'.join((
+            '- ::vector',
+            '- Up, up, and away!',
+            '- -123',
+            '- http://example.com/foo#bar',
+        ))
+        result = self.from_string(source)
+        self.assertListEqual(
+            result,
+            ['::vector', 'Up, up, and away!', '-123', 'http://example.com/foo#bar']
         )
