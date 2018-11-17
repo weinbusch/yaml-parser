@@ -37,6 +37,13 @@ class Parser(object):
         self.advance()
         return output
 
+    def join_tokens(self, types=[]):
+        output = []
+        while self.current and self.current.type in types:
+            output.append(self.current.value)
+            self.advance()
+        return ''.join(output)
+
     def stream(self):
         '''
         l-yaml-stream ::= l-document-prefix* l-any-document?
@@ -241,11 +248,11 @@ class Parser(object):
             # TODO: Handle multi-line
             if not self.current.type == 'scalar':
                 raise Exception('Expected a "scalar" found a {}'.format(self.current))
-            return self.consume_and_advance()
+            return self.join_tokens(['scalar', 'comma'])
         elif c in ['block-key', 'flow-key']:
             if not self.current.type == 'scalar':
                 raise Exception('Expected a "scalar" found a {}'.format(self.current))
-            return self.consume_and_advance()
+            return self.join_tokens(['scalar', 'comma'])
         else:
             raise Exception('Invalid value for c: "{}"'.format(c))
 

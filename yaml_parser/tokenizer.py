@@ -31,7 +31,7 @@ PATTERNS = [
     r'(?P<close_sequence>\])',
     r'(?P<open_mapping>\{)',
     r'(?P<close_mapping>\})',
-    r'(?P<comma>,)',
+    r'(?P<comma>,[ \t]*)',
     # Directives
     r'(?P<directive>---)',
     r'(?P<end_of_document>\.\.\.)',
@@ -39,7 +39,7 @@ PATTERNS = [
     r'(?P<anchor>&\w*)',
     r'(?P<alias>\*\w*)',
     # Scalars
-    r'(?P<scalar>([^{indicator_characters}\s]|[-?:,](?!\s))([^{inside_forbidden}\n\r]|#(?<![ ])|[:](?!\s))*)'.format(
+    r'(?P<scalar>([^{indicator_characters}\s]|[-?:](?=\S))([^{inside_forbidden}\n\r]|#(?<![ ])|[:](?=\S))*)'.format(
         indicator_characters = re.escape(INDICATOR_CHARACTERS),
         inside_forbidden = re.escape(INSIDE_FORBIDDEN)
     ),
@@ -114,3 +114,9 @@ def print_token(token):
     suffix = Back.RESET + Fore.RESET
     suffix += '' if token.value.endswith('\n') else ' '
     print(prefix + token.value + suffix, end='')
+
+if __name__ == '__main__':
+    import sys
+    filename = sys.argv[1]
+    for token in file_tokenizer(filename):
+        print(token)
