@@ -19,26 +19,32 @@ patterns = [
     r'(?P<anchor>&\S*)',
     r'(?P<alias>\*\S*)',
     r'(?P<literal>\|[+-]?)',
+    r'(?P<sequence_start>\[)',
+    r'(?P<sequence_end>\])',
+    r'(?P<comma>,)\s?',
 ]
 
 indicators = re.escape('-?:,[]{}#&*!|>"%@`' + "'")
 
-inside_forbidden = '[]{},'
+inside_forbidden = re.escape('[]{},')
 
 plain_scalar_outside = r'(?P<plain_scalar>([^{indicators}]|[:&-](?=\S))(([^:#]|[#:](?=\S))*[^\s:#])?)'.format(
     indicators=indicators)
 
+plain_scalar_inside = r'(?P<plain_scalar>([^{indicators}]|[:&-](?=\S))(([^:#{inside_forbidden}]|[#:](?=\S))*[^\s:#{inside_forbidden}])?)'.format(
+    indicators=indicators,
+    inside_forbidden=inside_forbidden)
 
 def _any(*patterns):
     return '|'.join(patterns)
 
-
-master_pattern = re.compile(_any(*patterns, plain_scalar_outside))
-
+outside_pattern = re.compile(_any(*patterns, plain_scalar_outside))
+inside_pattern = re.compile(_any(*patterns, plain_scalar_inside))
 
 def tokenizer(readline):
     # Readline is a callable that returns a single line of text, terminated with a \n character
     lineno = 0
+    pattern = outside_pattern
 
     while True:
         try:
@@ -60,12 +66,17 @@ def tokenizer(readline):
         yield Token(type='indentation', value=' '*indentation, line=line, lineno=lineno, start=0, end=pos)
 
         while pos < max:
-            m = master_pattern.match(line, pos)
+            m = pattern.match(line, pos)
             if m:
                 pos = m.end()
-                if m.lastgroup == 'whitespace':
+                type = m.lastgroup
+                if type == 'whitespace':
                     continue
-                yield Token(type=m.lastgroup, value=m.group(m.lastgroup), line=line, lineno=lineno, start=m.start(), end=m.end())
+                if type == 'sequence_start':
+                    pattern = inside_pattern
+                if type == 'sequence_end':
+                    pattern = outside_pattern
+                yield Token(type=type, value=m.group(type), line=line, lineno=lineno, start=m.start(), end=m.end())
             else:
                 yield Token(type='UNKNOWN', value=line[pos], line=line, lineno=lineno, start=pos, end=pos)
                 pos += 1

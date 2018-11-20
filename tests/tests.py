@@ -59,6 +59,16 @@ class TokenizerTest(TestCase):
         self.assertIsToken(tokens[16], type='plain_scalar', value='baz')
         self.assertIsToken(tokens[17], type='newline')
 
+    def test_flow_sequences(self):
+        source = '[foo, bar, baz]'
+        tokens = self.get_tokens(source)
+        self.assertIsToken(tokens[0], type='indentation')
+        self.assertIsToken(tokens[1], type='sequence_start', value='[')
+        self.assertIsToken(tokens[2], type='plain_scalar', value='foo')
+        self.assertIsToken(tokens[3], type='comma', value=',')
+        self.assertIsToken(tokens[-2], type='plain_scalar', value='baz')
+        self.assertIsToken(tokens[-1], type='sequence_end', value=']')
+
 class ParserTest(TestCase):
 
     def from_string(self, source):
