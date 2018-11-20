@@ -3,19 +3,19 @@
 ## Usage
 
 ```python
-from yaml_parser import load, prettyprint
+from yaml_parser import load
 
 filename = 'tests/simple.example.yaml'
 
 # Load data from .yaml file
 result = load(filename)
 print(result)
-
-# Print a colored version of the .yaml file
-prettyprint(filename)
 ```
 
 ## Note
+
+This is a test project driven by curiosity only. For a functioning Python YAML parser, take a look at
+[ruamel.yaml](https://pypi.org/project/ruamel.yaml/).
 
 YAML 1.2 documentation can be found [here](http://yaml.org/spec/1.2/spec.html).
 
@@ -25,11 +25,11 @@ look at `tests/simple.example.yaml`.
 
 `yaml_parser.parser.Parser` implements a recursive descent parser based on a reduced version of the YAML grammar.
 
-`yaml_parser.tokenizer.tokenizer` is a lexer/tokenizer for analysing YAML data. It covers more features of YAML than the parser.
+`yaml_parser.tokenizer.tokenizer` is a lexer/tokenizer for analysing YAML data.
 
 ## Testing
 
-Use `unittest`'s autodiscovery:
+Tests reside in `tests/tests.py`. Use `unittest`'s autodiscovery to run the tests:
 
 ```
 $ python -m unittest
