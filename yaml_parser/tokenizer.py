@@ -1,78 +1,91 @@
 
-import re, collections
+import re
+import collections
 from colorama import Fore, Back, init, deinit
 
-INDICATOR_CHARACTERS = "-?:,[]{}#&*!|>'%@`" + '"'
-INSIDE_FORBIDDEN = ":,[]{}#"
+import re
+import collections
 
-'''
-Plain scalars must never contain the “: ” and “ #” character combinations. 
-Such combinations would cause ambiguity with mapping key: value pairs and comments. 
-In addition, inside flow collections, or when used as implicit keys, plain scalars 
-must not contain the “[”, “]”, “{”, “}” and “,” characters. These characters would 
-cause ambiguity with flow collection structures. 
-'''
+Token = collections.namedtuple(
+    'Token', ['type', 'value', 'line', 'lineno', 'start', 'end'])
 
-PATTERNS = [
-    # Whitespace
-    r'(?P<indentation>(^[ \t]+))',
+patterns = [
+    r'(?P<whitespace>[ \t]+)',
     r'(?P<newline>[\r\n])',
-    r'(?P<empty_line>^[ \t]*[\n\r])',
-    # Comments
-    r'(?P<comment>#(?<=\s)[^\n\r]*)',
-    # Block indicators
-    r'(?P<colon>(:(?=\s)))',
-    r'(?P<dash>(-(?=\s)))',
-    r'(?P<complex_mapping_key>\?)',
-    r'(?P<literal>\|[-+]?)',
-    r'(?P<folded>\>)',
-    # Flow indicators
-    r'(?P<open_sequence>\[)',
-    r'(?P<close_sequence>\])',
-    r'(?P<open_mapping>\{)',
-    r'(?P<close_mapping>\})',
-    r'(?P<comma>,[ \t]*)',
-    # Directives
     r'(?P<directive>---)',
-    r'(?P<end_of_document>\.\.\.)',
-    # Anchor and alias
-    r'(?P<anchor>&\w*)',
-    r'(?P<alias>\*\w*)',
-    # Scalars
-    r'(?P<scalar>([^{indicator_characters}\s]|[-?:](?=\S))([^{inside_forbidden}\n\r]|#(?<![ ])|[:](?=\S))*)'.format(
-        indicator_characters = re.escape(INDICATOR_CHARACTERS),
-        inside_forbidden = re.escape(INSIDE_FORBIDDEN)
-    ),
-    # Tags
-    r'(?P<tag>!.+)',
+    r'(?P<tag>!.*)',
+    r'(?P<mapping_value>(:(?=\s))|(:$))',
+    r'(?P<sequence_entry>(-(?=\s))|(-$))',
+    r'(?P<anchor>&\S*)',
+    r'(?P<alias>\*\S*)',
+    r'(?P<literal>\|[+-]?)',
 ]
 
-MASTER_PATTERN = re.compile('|'.join(PATTERNS))
+indicators = re.escape('-?:,[]{}#&*!|>"%@`' + "'")
 
-Token = collections.namedtuple('Token', ['type', 'value', 'line', 'column'])
+inside_forbidden = '[]{},'
 
-def file_tokenizer(filename, pattern=MASTER_PATTERN):
+plain_scalar_outside = r'(?P<plain_scalar>([^{indicators}]|[:&-](?=\S))(([^:#]|[#:](?=\S))*[^\s:#])?)'.format(
+    indicators=indicators)
+
+
+def _any(*patterns):
+    return '|'.join(patterns)
+
+
+master_pattern = re.compile(_any(*patterns, plain_scalar_outside))
+
+
+def tokenizer(readline):
+    # Readline is a callable that returns a single line of text, terminated with a \n character
+    lineno = 0
+
+    while True:
+        try:
+            line = readline()
+        except StopIteration:
+            line = '' # Make looping using file.readline consistent with looping using string.splitlines
+        if not line:
+            break
+        lineno += 1
+        indentation = 0
+        pos, max = 0, len(line)
+
+        while pos < max:  # measure indentation
+            if line[pos] == ' ':
+                indentation += 1
+            else:
+                break
+            pos += 1
+        yield Token(type='indentation', value=' '*indentation, line=line, lineno=lineno, start=0, end=pos)
+
+        while pos < max:
+            m = master_pattern.match(line, pos)
+            if m:
+                pos = m.end()
+                if m.lastgroup == 'whitespace':
+                    continue
+                yield Token(type=m.lastgroup, value=m.group(m.lastgroup), line=line, lineno=lineno, start=m.start(), end=m.end())
+            else:
+                yield Token(type='UNKNOWN', value=line[pos], line=line, lineno=lineno, start=pos, end=pos)
+                pos += 1
+
+       #  yield Token(type='newline', value='\n', line=line, lineno=lineno, start=max, end=max)
+
+
+def file_tokenizer(filename):
     with open(filename, 'r', encoding='utf8') as f:
-        lineno = 1
-        for line in f:
-            for token in line_tokenizer(line, lineno, pattern):
-                yield token
-            lineno += 1
-
-def string_tokenizer(source, pattern=MASTER_PATTERN):
-    lineno = 1
-    for line in source.splitlines(keepends=True):
-        for token in line_tokenizer(line, lineno, pattern):
+        for token in tokenizer(f.readline):
             yield token
-        lineno +=1
 
-def line_tokenizer(line, lineno, pattern=MASTER_PATTERN):
-    for m in pattern.finditer(line):
-        kind = m.lastgroup
-        value = m.group()
-        column = m.start() + 1
-        token = Token(kind, value, lineno, column)
+
+def string_tokenizer(source):
+    def generator(source):
+        for line in source.splitlines(keepends=True): # keepends to make string.splitlines consistent with file.readline
+            yield line
+    for token in tokenizer(generator(source).__next__):
         yield token
+
 
 def prettyprint(filename, encoding='utf8'):
     init()
@@ -82,6 +95,7 @@ def prettyprint(filename, encoding='utf8'):
         print()
     finally:
         deinit()
+
 
 TOKEN_STYLES = {
     'indentation': Back.CYAN,
@@ -108,12 +122,14 @@ TOKEN_STYLES = {
     'tag': Back.LIGHTRED_EX + Fore.CYAN,
 }
 
+
 def print_token(token):
     prefix = TOKEN_STYLES.get(token.type, '')
     prefix += '\\n' if token.type == 'newline' else ''
     suffix = Back.RESET + Fore.RESET
     suffix += '' if token.value.endswith('\n') else ' '
     print(prefix + token.value + suffix, end='')
+
 
 if __name__ == '__main__':
     import sys

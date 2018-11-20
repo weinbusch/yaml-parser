@@ -8,6 +8,8 @@ Recursive descent parser based on YAML grammar according to
 
 class Parser(object):
 
+    skip_tokens = ['tag']
+
     def from_file(self, filename, encoding='utf8'):
         self.tokenizer = file_tokenizer(filename)
         return self.parse()
@@ -29,7 +31,7 @@ class Parser(object):
     def advance(self):
         self.current, self.next = self.next, next(self.tokenizer, None)
         # skip some tokens:
-        while self.current and self.current.type in ['tag']:
+        while self.current and self.current.type in self.skip_tokens:
             self.advance()
 
     def consume_and_advance(self):
@@ -50,6 +52,9 @@ class Parser(object):
                         ( l-document-suffix+ l-document-prefix* l-any-document?
                         | l-document-prefix* l-explicit-document? )*        
         '''
+        # Skip all initial newline and indentation tags
+        while self.current.type in ['newline', 'indentation']:
+            self.advance()
         return self.any_document()
 
     def any_document(self):
@@ -73,7 +78,7 @@ class Parser(object):
                                         | ( e-node s-l-comments ) ) 
         c-directives-end 	::= 	“-” “-” “-”
         '''
-        if self.current.value != '---':
+        if self.current.type != 'directive':
             return
         self.advance()
         return self.bare_document() # TODO: e-node, comments
@@ -118,18 +123,18 @@ class Parser(object):
                        /* For some fixed auto-detected m > 0 */
         '''
         # We should be either looking at an explicit mapping, i.e. a '?' token
-        # or at an implicit mapping key, i.e. a 'scalar' followed by a 'colon' token. 
+        # or at an implicit mapping key, i.e. a 'scalar' followed by a ':' token. 
         # If not, return.
-        if self.current.type != 'complex_mapping_key' and (self.next == None or self.next.type != 'colon'):
+        if self.current.type != 'complex_mapping_key' and (self.next == None or self.next.type != 'mapping_value'):
             return
         mapping = {}
         n_plus_m = self.indentation
         while self.current:
-            self.indent()
             if self.indentation < n_plus_m:
                 break
             entry = self.block_map_entry(n_plus_m)            
             mapping.update(entry)
+            self.indent()
         return mapping
 
     def block_map_entry(self, n):
@@ -169,8 +174,8 @@ class Parser(object):
         c-l-block-map-implicit-value(n) ::= “:” ( s-l+block-node(n,block-out)
                                         | ( e-node s-l-comments ) )
         '''
-        if not self.current.type == 'colon':
-            raise Exception('Expected a "colon", found a {}'.format(self.current))
+        if not self.current.type == 'mapping_value':
+            raise Exception('Expected a ":", found a {}'.format(self.current))
         self.advance()
         return self.block_node(n, 'block-out') # TODO: e-node, comments
 
@@ -179,17 +184,17 @@ class Parser(object):
         l+block-sequence(n) 	::= 	( s-indent(n+m) c-l-block-seq-entry(n+m) )+
                                         /* For some fixed auto-detected m > 0 */ 
         '''
-        # We expect looking at a dash
-        if self.current.type != 'dash':
+        # We expect looking at a sequence_entry
+        if self.current.type != 'sequence_entry':
             return 
         sequence = []
         n_plus_m = self.indentation
         while self.current:
-            self.indent()
             if self.indentation < n_plus_m:
                 break
             entry = self.block_seq_entry(self.indentation)            
             sequence.append(entry)
+            self.indent()
         return sequence
 
     def block_seq_entry(self, n):
@@ -202,8 +207,8 @@ class Parser(object):
                                             | s-l+block-node(n,c)
                                             | ( e-node s-l-comments )
         '''
-        if not self.current.type == 'dash':
-            raise Exception('Expected a "dash", found a {}'.format(self.current))
+        if not self.current.type == 'sequence_entry':
+            raise Exception('Expected a "-", found a {}'.format(self.current))
         self.advance()
         self.indent()
         return self.block_node(n, 'block-in') # TODO: compact-sequence, compact-mapping, e-node, comments
@@ -244,22 +249,18 @@ class Parser(object):
                                     /* Followed by an ns-plain-safe(c)) */ ) 
         nb-ns-plain-in-line(c) 	::= 	( s-white* ns-plain-char(c) )* 
         '''
-        if c in ['flow-out', 'flow-in']:
+        if c in ['flow-out', 'flow-in', 'block-key', 'flow-key']:
             # TODO: Handle multi-line
-            if not self.current.type == 'scalar':
+            if not self.current.type == 'plain_scalar':
                 raise Exception('Expected a "scalar" found a {}'.format(self.current))
-            return self.join_tokens(['scalar', 'comma'])
-        elif c in ['block-key', 'flow-key']:
-            if not self.current.type == 'scalar':
-                raise Exception('Expected a "scalar" found a {}'.format(self.current))
-            return self.join_tokens(['scalar', 'comma'])
+            return self.consume_and_advance()
         else:
             raise Exception('Invalid value for c: "{}"'.format(c))
 
     def indent(self):
-        if self.current.type == 'newline':
+        if self.current and self.current.type == 'newline':
             self.indentation = 0
             self.advance()
-        if self.current.type == 'indentation':
+        if self.current and self.current.type == 'indentation':
             self.indentation = len(self.current.value)
             self.advance()

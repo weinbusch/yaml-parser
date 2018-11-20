@@ -3,6 +3,62 @@ from unittest import TestCase
 from yaml_parser.tokenizer import string_tokenizer, file_tokenizer
 from yaml_parser.parser import Parser
 
+class TokenizerTest(TestCase):
+
+    def assertIsToken(self, token, **kwargs):
+        for key, value in kwargs.items():
+            self.assertEqual(getattr(token, key), value)
+
+    def get_tokens(self, source):
+        return list(string_tokenizer(source))
+
+    def test_mappings(self):
+        source = (
+            'foo  :    bar\n'
+            'baz:\n'
+            '    foobar'
+        )
+        tokens = self.get_tokens(source)
+        self.assertIsToken(tokens[0], type='indentation', value='')
+        self.assertIsToken(tokens[1], type='plain_scalar', value='foo')
+        self.assertIsToken(tokens[2], type='mapping_value', value=':')
+        self.assertIsToken(tokens[3], type='plain_scalar', value='bar')
+        self.assertIsToken(tokens[4], type='newline', value='\n')
+        self.assertIsToken(tokens[5], type='indentation', value='')
+        self.assertIsToken(tokens[6], type='plain_scalar', value='baz')
+        self.assertIsToken(tokens[7], type='mapping_value', value=':')
+        self.assertIsToken(tokens[8], type='newline', value='\n')
+        self.assertIsToken(tokens[9], type='indentation', value='    ')
+        self.assertIsToken(tokens[10], type='plain_scalar', value='foobar')
+
+    def test_sequences(self):
+        source = (
+            '- foo\n'
+            '-    bar\n'
+            '   - baz\n'
+            '- \n' 
+            '  baz\n'
+        )
+        tokens = self.get_tokens(source)
+        self.assertIsToken(tokens[0], type='indentation', value='')
+        self.assertIsToken(tokens[1], type='sequence_entry', value='-')
+        self.assertIsToken(tokens[2], type='plain_scalar', value='foo')
+        self.assertIsToken(tokens[3], type='newline')
+        self.assertIsToken(tokens[4], type='indentation', value='')
+        self.assertIsToken(tokens[5], type='sequence_entry', value='-')
+        self.assertIsToken(tokens[6], type='plain_scalar', value='bar')
+        self.assertIsToken(tokens[7], type='newline')
+        self.assertIsToken(tokens[8], type='indentation', value='   ')
+        self.assertIsToken(tokens[9], type='sequence_entry', value='-')
+        self.assertIsToken(tokens[10], type='plain_scalar', value='baz')
+        self.assertIsToken(tokens[11], type='newline')
+        self.assertIsToken(tokens[12], type='indentation', value='')
+        self.assertIsToken(tokens[13], type='sequence_entry', value='-')
+        self.assertIsToken(tokens[14], type='newline')
+        self.assertIsToken(tokens[15], type='indentation', value='  ')
+        self.assertIsToken(tokens[16], type='plain_scalar', value='baz')
+        self.assertIsToken(tokens[17], type='newline')
+
 class ParserTest(TestCase):
 
     def from_string(self, source):
@@ -44,6 +100,13 @@ class ParserTest(TestCase):
             result,
             dict(name='Max Mustermann', age='33')
         )
+
+    def test_implicit_keys(self):
+        source = (
+            'key with whitespace : value with whitespace'
+        )
+        result = self.from_string(source)
+        self.assertDictEqual(result, {'key with whitespace': 'value with whitespace'})
 
     def test_sequence(self):
         source = '\n'.join([
