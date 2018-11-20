@@ -18,7 +18,7 @@ patterns = [
     r'(?P<literal>\|[+-]?)',
     r'(?P<sequence_start>\[)',
     r'(?P<sequence_end>\])',
-    r'(?P<comma>,)\s?',
+    r'(?P<comma>,)',
 ]
 
 indicators = re.escape('-?:,[]{}#&*!|>"%@`' + "'")
