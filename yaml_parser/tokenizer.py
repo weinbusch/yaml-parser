@@ -3,9 +3,6 @@ import re
 import collections
 from colorama import Fore, Back, init, deinit
 
-import re
-import collections
-
 Token = collections.namedtuple(
     'Token', ['type', 'value', 'line', 'lineno', 'start', 'end'])
 
