@@ -9,11 +9,11 @@ def _any(*patterns):
     # Helper function for joining patters
     return '|'.join(patterns)
 
-indicators = re.escape('-?:,[]{}#&*!|>"%@`' + "'")
+INDICATORS = re.escape('-?:,[]{}#&*!|>"%@`' + "'")
 
-inside_forbidden = re.escape('[]{},') # Plain scalars inside flow collections must not contain these
+INSIDE_FORBIDDEN = re.escape('[]{},') # Plain scalars inside flow collections must not contain these
 
-patterns = [ # General patterns
+PATTERNS = [ # General patterns
     r'(?P<whitespace>[ \t]+)',
     r'(?P<newline>[\r\n])',
     r'(?P<directive>---)',
@@ -36,11 +36,11 @@ def plain_scalar(head_forbidden='', tail_forbidden=''):
     return pattern
 
 # Different patterns for plain scalars, depending whether they are inside or outside of a flow collection
-plain_scalar_outside = plain_scalar(head_forbidden=indicators, tail_forbidden='')
-plain_scalar_inside = plain_scalar(head_forbidden=indicators, tail_forbidden=inside_forbidden)
+PLAIN_SCALAR_OUTSIDE = plain_scalar(head_forbidden=INDICATORS, tail_forbidden='')
+PLAIN_SCALAR_INSIDE = plain_scalar(head_forbidden=INDICATORS, tail_forbidden=INSIDE_FORBIDDEN)
 
-outside_pattern = re.compile(_any(*patterns, plain_scalar_outside))
-inside_pattern = re.compile(_any(*patterns, plain_scalar_inside))
+OUTSIDE_PATTERN = re.compile(_any(*PATTERNS, PLAIN_SCALAR_OUTSIDE))
+INSIDE_PATTERN = re.compile(_any(*PATTERNS, PLAIN_SCALAR_INSIDE))
 
 def tokenizer(readline):
     '''
@@ -55,7 +55,7 @@ def tokenizer(readline):
     '''
 
     lineno = 0
-    pattern = outside_pattern
+    pattern = OUTSIDE_PATTERN
 
     while True:
         try:
@@ -85,9 +85,9 @@ def tokenizer(readline):
                 if type == 'whitespace': # skip whitespace
                     continue
                 if type == 'sequence_start': # switch patterns
-                    pattern = inside_pattern
+                    pattern = INSIDE_PATTERN
                 if type == 'sequence_end':
-                    pattern = outside_pattern
+                    pattern = OUTSIDE_PATTERN
                 yield Token(type=type, value=m.group(type), line=line, lineno=lineno, start=m.start(), end=m.end())
             else:
                 yield Token(type='UNKNOWN', value=line[pos], line=line, lineno=lineno, start=pos, end=pos)
