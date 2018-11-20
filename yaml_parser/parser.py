@@ -19,6 +19,7 @@ class Parser(object):
         return self.parse()
 
     def parse(self):
+        self.anchor_dict = {}
         self.current = None
         self.next = next(self.tokenizer)
         self.advance()
@@ -110,12 +111,21 @@ class Parser(object):
         s-separate-lines(n) 	::= 	  ( s-l-comments s-flow-line-prefix(n) )
                                           | s-separate-in-line
         s-separate-in-line 	::= 	s-white+ | /* Start of line */ 
+        c-ns-properties(n,c) 	::=     ( c-ns-tag-property
+                                        ( s-separate(n,c) c-ns-anchor-property )? )
+                                        | ( c-ns-anchor-property
+                                            ( s-separate(n,c) c-ns-tag-property )? ) 
         s-l-comments 	::= 	( s-b-comment | /* Start of line */ )
                                 l-comment* 
         s-flow-line-prefix(n) 	::= 	s-indent(n) s-separate-in-line?
         '''
         self.indent()
-        return self.block_mapping(n) or self.block_sequence(n) # TODO: comments, properties, separate
+        anchor = self.anchor()
+        self.indent()
+        collection = self.block_mapping(n) or self.block_sequence(n) # TODO: comments, properties, separate
+        if anchor:
+            self.anchor_dict[anchor] = collection
+        return collection
 
     def block_mapping(self, n):
         '''
@@ -229,7 +239,7 @@ class Parser(object):
                               ns-flow-content(n,c) )
                             | e-scalar ) )
         '''
-        return self.flow_content(n, c) # TODO: alias, properties, separate, e-scalar
+        return self.alias() or self.flow_content(n, c) # TODO: alias, properties, separate, e-scalar
 
     def flow_content(self, n, c):
         '''
@@ -264,3 +274,15 @@ class Parser(object):
         if self.current and self.current.type == 'indentation':
             self.indentation = len(self.current.value)
             self.advance()
+
+    def anchor(self):
+        if self.current.type == 'anchor':
+            value = self.current.value[1:]
+            self.advance()
+            return value
+
+    def alias(self):
+        if self.current.type == 'alias':
+            value = self.current.value[1:]
+            self.advance()
+            return self.anchor_dict[value]

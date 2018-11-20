@@ -81,6 +81,11 @@ class ParserTest(TestCase):
             result['teams'][0]['league'], 'Champions League'
         )
 
+    def test_invoice_example_file(self):
+        filename = 'tests/invoice.example.yaml'
+        result = Parser().from_file(filename)
+        self.assertEqual(result['invoice'], '34843')
+
     # TODO: Flow scalars
 
     # Plain scalars
@@ -184,6 +189,18 @@ class ParserTest(TestCase):
             result,
             ['Max Mustermann', dict(street='Musterstraße', city='Neustadt'), '33']
         )
+
+    # Anchors
+
+    def test_anchors_and_alias(self):
+        source = (
+            'primary: &foo\n'
+            '   - first\n'
+            '   - second\n'
+            'secondary: *foo\n'
+        )
+        result = self.from_string(source)
+        self.assertListEqual(result['primary'], result['secondary'])
 
     # Documents
 
