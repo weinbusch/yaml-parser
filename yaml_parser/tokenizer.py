@@ -25,15 +25,17 @@ patterns = [
 ]
 
 indicators = re.escape('-?:,[]{}#&*!|>"%@`' + "'")
-
 inside_forbidden = re.escape('[]{},')
 
-plain_scalar_outside = r'(?P<plain_scalar>([^{indicators}]|[:&-](?=\S))(([^:#]|[#:](?=\S))*[^\s:#])?)'.format(
-    indicators=indicators)
+def plain_scalar(head_forbidden='', tail_forbidden=''):
+    head = r'[^{0}]|[:&-](?=\S)'.format(head_forbidden)
+    tail = r'([^:#{0}]|[:#](?=\S))*[^\s:#{0}]'.format(tail_forbidden)
+    pattern = r'(?P<plain_scalar>({0})({1})?)'.format(head, tail)
+    return pattern
 
-plain_scalar_inside = r'(?P<plain_scalar>([^{indicators}]|[:&-](?=\S))(([^:#{inside_forbidden}]|[#:](?=\S))*[^\s:#{inside_forbidden}])?)'.format(
-    indicators=indicators,
-    inside_forbidden=inside_forbidden)
+# Different patterns for plain scalars, depending whether they are inside or outside of a flow collection
+plain_scalar_outside = plain_scalar(head_forbidden=indicators, tail_forbidden='')
+plain_scalar_inside = plain_scalar(head_forbidden=indicators, tail_forbidden=inside_forbidden)
 
 def _any(*patterns):
     return '|'.join(patterns)
@@ -70,9 +72,9 @@ def tokenizer(readline):
             if m:
                 pos = m.end()
                 type = m.lastgroup
-                if type == 'whitespace':
+                if type == 'whitespace': # skip whitespace
                     continue
-                if type == 'sequence_start':
+                if type == 'sequence_start': # switch patterns
                     pattern = inside_pattern
                 if type == 'sequence_end':
                     pattern = outside_pattern
@@ -80,9 +82,6 @@ def tokenizer(readline):
             else:
                 yield Token(type='UNKNOWN', value=line[pos], line=line, lineno=lineno, start=pos, end=pos)
                 pos += 1
-
-       #  yield Token(type='newline', value='\n', line=line, lineno=lineno, start=max, end=max)
-
 
 def file_tokenizer(filename):
     with open(filename, 'r', encoding='utf8') as f:
